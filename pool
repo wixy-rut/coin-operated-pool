@@ -1,0 +1,136 @@
+import tkinter as tk
+from tkinter import messagebox
+import time
+
+class CoinOperatedPoolGUI:
+    def __init__(self, master):
+        self.master = master 
+        self.master.title("Coin-Operated Pool Table")
+        self.master.geometry("400x300")
+
+        # Initialize components
+        self.coin_detector = self.CoinDetector(self)
+        self.safe = self.Safe()
+        self.ball_release_system = self.BallReleaseSystem(master, self.safe)  # Pass master here
+
+        # Create GUI widgets
+        self.create_widgets()
+
+    class CoinDetector:
+        def __init__(self, parent):
+            self.parent = parent
+            self.coin_value = 0
+            self.required_value = 20
+            self.excess_coins = 0
+            self.accepted_time = None  # Record the time when coin is accepted
+
+        def detect_coin_insertion(self, coin_value):
+            """Detects coin insertion and handles acceptance or rejection."""
+            try:
+                if coin_value == self.required_value:
+                    self.coin_value += coin_value
+                    self.accepted_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())  # Record the time
+                    messagebox.showinfo("Coin Accepted", f"Coin accepted at {self.accepted_time}.")
+                    return True
+                elif coin_value > self.required_value:
+                    self.excess_coins += coin_value - self.required_value
+                    self.coin_value += self.required_value
+                    messagebox.showinfo("Excess Coins Returned", f"Excess coins returned: {coin_value - self.required_value}.")
+                    return True
+                else:
+                    raise ValueError("Invalid coin value. Please insert a valid coin.")
+            except ValueError as ve:
+                messagebox.showerror("Error", str(ve))
+                return False
+
+        def detect_impact(self, acceleration):
+            """Detects impact and triggers ball release."""
+            threshold = 1
+            if acceleration >= threshold:
+                messagebox.showinfo("Impact Detected", "Coin impact detected! Releasing balls for game to start...")
+                self.parent.ball_release_system.release_balls()
+            else:
+                messagebox.showinfo("No Impact Detected", "No coin impact detected.")
+
+        def return_excess_coins(self):
+            """Returns excess coins if any."""
+            if self.excess_coins  > 0:
+                messagebox.showinfo("Excess Coins Returned", f"Returning {self.excess_coins} excess coins...")
+                self.excess_coins = 0
+
+    class BallReleaseSystem:
+        def __init__(self, master, safe):
+            self.master = master  # Assign master here
+            self.safe = safe
+            self.total_balls = 16
+            self.balls_remaining = self.total_balls
+            self.batch_size = 4  # Set the batch size
+            self.release_delay = 1000  # Set the release delay in milliseconds
+            self.coin_button_disabled = False  # Flag to track button state
+
+        def release_balls(self):
+            """Releases balls automatically in batches."""
+            if self.balls_remaining > 0:
+                self.release_next_batch()
+                self.coin_button_disabled = True  # Disable coin button during ball release
+            else:
+                messagebox.showerror("Error", "No balls remaining.")
+
+        def release_next_batch(self):
+            """Releases the next batch of balls."""
+            batch_size = min(self.batch_size, self.balls_remaining)
+            messagebox.showinfo("Ball Release", f"Releasing {batch_size} balls...")
+            self.balls_remaining -= batch_size
+            if self.balls_remaining > 0:
+                self.master.after(self.release_delay, self.release_next_batch)
+            else:
+                messagebox.showinfo("Ball Release", "All balls released.")
+                self.safe.lock()
+                self.coin_button_disabled = False  # Enable coin button after balls release
+
+    class Safe:
+        def __init__(self):
+            self.locked = True
+
+        def unlock(self):
+            messagebox.showinfo("Safe Status", "Unlocking safe...")
+            self.locked = False
+
+        def lock(self):
+            messagebox.showinfo("Safe Status", "Locking safe...")
+            self.locked = True
+
+    def create_widgets(self):
+        """Creates GUI widgets."""
+        self.label = tk.Label(self.master, text="Insert coin (20 units):")
+        self.label.pack()
+
+        self.coin_entry = tk.Entry(self.master)
+        self.coin_entry.pack()
+
+        self.coin_button = tk.Button(self.master, text="Insert Coin", command=self.insert_coin)
+        self.coin_button.pack()
+
+    def insert_coin(self):
+        """Handles coin insertion."""
+        if self.ball_release_system.coin_button_disabled:  # Check if button is disabled
+            messagebox.showinfo("Coin Insertion Disabled", "Coin insertion is disabled while balls are being released.")
+            return
+
+        try:
+            coin_value = int(self.coin_entry.get())
+            inserted = self.coin_detector.detect_coin_insertion(coin_value)
+            if inserted:
+                self.coin_entry.delete(0, tk.END)
+                # Simulate acceleration and call detect_impact
+                self.coin_detector.detect_impact(2)  # Example: passing an acceleration value
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid integer value for the coin.")
+
+def main():
+    root = tk.Tk()
+    CoinOperatedPoolGUI(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
